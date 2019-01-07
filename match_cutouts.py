@@ -25,6 +25,12 @@ if __name__ == "__main__":
                         type=str,
             help="Output filename")
 
+    parser.add_argument("--keep", default=False,
+                        action="store_true",
+                        help="Keep intermediate frame")
+    parser.add_argument("--interpol", default="LANCZOS3",
+                        help="interpolateion scheme (use BILINEAR for weight maps)")
+
     args = parser.parse_args()
 
 
@@ -80,6 +86,7 @@ if __name__ == "__main__":
     -PIXELSCALE_TYPE MANUAL
     -PIXEL_SCALE %(pixelscale).9f
     -IMAGE_SIZE %(nx)d,%(ny)d
+    -RESAMPLING_TYPE %(interpol)s
     %(memory_setup)s
     %(input)s
     """ % dict(
@@ -90,6 +97,7 @@ if __name__ == "__main__":
         ny=2*out_ny,
         input=file2match,
         memory_setup=memory_setup,
+        interpol=args.interpol,
     )
     run_swarp = " ".join(swarp_cmd.split())
     print(run_swarp)
@@ -97,7 +105,7 @@ if __name__ == "__main__":
     
 
     tmp_hdu = pyfits.open(swarp_tmp_fn)
-    print(tmp_hdu[0].header)
+    # print(tmp_hdu[0].header)
     out_wcs = astWCS.WCS(tmp_hdu[0].header, mode='pyfits')
     
     ra_ll, dec_ll = wcs.pix2wcs(0.5, 0.5) 
@@ -106,7 +114,7 @@ if __name__ == "__main__":
     print(_llx, _lly)
 
     llx, lly = int(numpy.floor(_llx)), int(numpy.floor(_lly))
-    print(llx, lly)
+    # print(llx, lly)
 
     final_data = tmp_hdu[0].data[lly:lly+hdr['NAXIS2'], llx:llx+hdr['NAXIS1']]
     final_hdu = pyfits.PrimaryHDU(header=tmp_hdu[0].header, data=final_data)
@@ -114,5 +122,7 @@ if __name__ == "__main__":
     final_hdu.header['CRPIX2'] -= lly
     final_hdu.writeto(output_fn, clobber=True)
 
-    print(final_data.shape, hdr['NAXIS1'], hdr['NAXIS2'])
-    os.remove(swarp_tmp_fn)
+    print("output image size:", final_data.shape, hdr['NAXIS1'], hdr['NAXIS2'])
+
+    if (not args.keep):
+        os.remove(swarp_tmp_fn)
